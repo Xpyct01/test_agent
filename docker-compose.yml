@@ -1,11 +1,14 @@
-# Local stack: the trip planner API plus a self-hosted Langfuse v3.
+# Local stack: the trip planner API, its own PostgreSQL and a self-hosted Langfuse v3.
 #
 #   docker compose up -d                 # everything
 #   docker compose up -d langfuse-web    # Langfuse only (run the app with uv)
+#   docker compose up -d trip-planner-postgres && uv run alembic upgrade head
+#                                        # app database only, migrated from the host
 #
 # Langfuse UI: http://localhost:3000. Its login and API keys (below) are
 # created on first start. Host ports: LANGFUSE_PORT (3000), MINIO_PORT (9090),
-# TRIP_PLANNER_PORT (8000). MinIO also hosts the DVC remote (bucket `dvc`,
+# TRIP_PLANNER_PORT (8000), TRIP_DATABASE_PORT (5433). The app database
+# (trip-planner-postgres) is a separate server from Langfuse's `postgres`. MinIO also hosts the DVC remote (bucket `dvc`,
 # see trip_planner/experiments/README.md). The defaults are for local development only:
 # override them in the root .env before exposing this stack anywhere.
 
@@ -68,11 +71,49 @@ services:
       TRIP_OBSERVABILITY_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-pk-lf-local-dev}
       TRIP_OBSERVABILITY_LANGFUSE_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-sk-lf-local-dev}
       TRIP_SIMULATION_OUTPUT_DIR: /srv/trajectories
+      TRIP_DATABASE_HOST: trip-planner-postgres
+      TRIP_DATABASE_PORT: "5432"
     volumes:
       - ./trajectories:/srv/trajectories
     depends_on:
       langfuse-web:
         condition: service_started
+      trip-planner-migrate:
+        condition: service_completed_successfully
+
+  # Applies the alembic migrations to the app database, then exits.
+  trip-planner-migrate:
+    build:
+      context: .
+      dockerfile: trip_planner/Dockerfile
+    command: ["uv", "run", "--no-dev", "alembic", "upgrade", "head"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TRIP_DATABASE_HOST: trip-planner-postgres
+      TRIP_DATABASE_PORT: "5432"
+    depends_on:
+      trip-planner-postgres:
+        condition: service_healthy
+
+  # The trip planner's own database; Langfuse keeps its `postgres` below.
+  trip-planner-postgres:
+    image: docker.io/postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TRIP_DATABASE_USER:-trip_planner}
+      POSTGRES_PASSWORD: ${TRIP_DATABASE_PASSWORD:-trip_planner}
+      POSTGRES_DB: ${TRIP_DATABASE_NAME:-trip_planner}
+    ports:
+      - "${TRIP_DATABASE_PORT:-5433}:5432"
+    volumes:
+      - trip_planner_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   langfuse-web:
     image: docker.io/langfuse/langfuse:3
@@ -168,6 +209,7 @@ services:
       REDIS_PASSWORD: ${REDIS_AUTH:-myredissecret}
 
 volumes:
+  trip_planner_postgres_data:
   langfuse_postgres_data:
   langfuse_clickhouse_data:
   langfuse_clickhouse_logs:

@@ -5,6 +5,8 @@ description = "Two-agent LangGraph simulation that plans mountain trips to Picos
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
     "fastapi",
     "httpx",
     "langchain-core",
@@ -14,6 +16,8 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "pyyaml",
+    "sqlalchemy[asyncio]>=2.1.9",
+    "sqlmodel>=0.0.50",
     "uvicorn",
 ]
 
@@ -32,3 +36,12 @@ testpaths = ["trip_planner/unit_test"]
 
 [tool.uv]
 package = false
+
+[tool.alembic]
+# Migrations of the trip planner database. Run from the repository root:
+#   uv run alembic upgrade head
+# The database URL comes from the TRIP_DATABASE_ settings (env.py), not from here.
+script_location = "%(here)s/trip_planner/app/core/migrations"
+file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+prepend_sys_path = ["."]
+output_encoding = "utf-8"

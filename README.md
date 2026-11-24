@@ -253,6 +253,27 @@ All settings are environment variables (or `.env`), grouped by section under `tr
 | `TRIP_SIMULATION_` | max ticks, base seed, failure rates, tool attempts, back-off, output dir |
 | `TRIP_WEATHER_` | `variant` (`open_meteo` \| `fixture`), coordinates, timeout |
 | `TRIP_OBSERVABILITY_` | Langfuse keys and host |
+| `TRIP_DATABASE_` | PostgreSQL of the app: host, port (5433), user, password, name, echo, pool size |
+
+## Database (PostgreSQL, SQLModel, Alembic)
+
+The app has its own PostgreSQL (`trip-planner-postgres` in `docker-compose.yml`, host port 5433). It is a separate server from the `postgres` Langfuse uses. Tables are SQLModel classes in `trip_planner/app/core/sql_models/`. Alembic migrations live in `trip_planner/app/core/migrations/`, and the Alembic config is the `[tool.alembic]` table of `pyproject.toml`. `docker compose up` runs the migrations in the one-shot `trip-planner-migrate` service before the API starts. To work from the host:
+
+```powershell
+docker compose up -d trip-planner-postgres
+uv run alembic upgrade head
+uv run alembic revision --autogenerate -m "describe the change"   # after editing sql_models/
+```
+
+| Group | Tables | Source |
+|---|---|---|
+| Trails | `trails`, `trail_closures` | `experiments/data/picos_trails/trails.csv` (park pages). Curated columns (`massif`, `route_type`, `rockfall_risk`, `highlights`) stay nullable. |
+| Gear | `gear_categories`, `gear_products`, `equipment_items`, `rental_stock` | `gear_products` comes from `experiments/data/hiking_gear/gear_items.csv`. `equipment_items` is the checklist the agents use (`data/equipment.json`). |
+| People | `guides`, `customers`, `customer_gear` | `data/guides.json`, plus the customer profile, health notes and owned gear |
+| Bookings | `bookings`, `booking_rentals` | Content-derived booking id (idempotent retries). A partial unique index allows one confirmed booking per guide per day. |
+| Evaluation | `simulation_batches`, `simulation_runs`, `trajectory_events` | `Trajectory` / `BatchSummary` of each run, for convergence and drift queries |
+
+The repositories still read `trip_planner/data/`. Moving them to the database is a separate step.
 
 ## Code layout
 
@@ -264,7 +285,7 @@ trip_planner/
     service_launcher.py     FastAPI app
     agents/                 BaseAgent (generic graph), the two agents + prompts, tools/ (ToolSet), callbacks/
     config/                 settings sections
-    core/                   errors, schemas, repositories/local_store
+    core/                   errors, schemas, repositories/local_store, sql_models, migrations
     inference/              routers + services (InferenceService, SimulationService)
     ml/                     environment, fault_injection, simulated_human, weather_forecast,
                             fitness_assessment, trail_selection, equipment_check, evaluation
