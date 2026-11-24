@@ -217,7 +217,7 @@ def parse_elevation(text: str) -> tuple[int | None, int | None]:
 def parse_duration_h(text: str) -> float | None:
     """Returns the first duration in hours, e.g. 3.33 from '3 h. 20 min. ...'."""
     match = re.search(
-        r'(\d+(?:[.,]\d+)?)\s*(?:h|horas?)\.?(?:\s*(?:y\s*)?(\d+)\s*(?:min|m)\b)?',
+        r'(\d+(?:[.,]\d+)?)\s*(?:horas?|h)\.?(?:\s*(?:y\s*)?(\d+)\s*(?:min|m)\b)?',
         text,
         re.IGNORECASE,
     )
