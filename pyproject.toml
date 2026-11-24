@@ -21,6 +21,7 @@ dependencies = [
 dev = ["pytest", "pytest-asyncio"]
 experiments = [
     "beautifulsoup4>=4.15.0",
+    "dvc[s3]>=3.67.1",
 ]
 
 [tool.pytest.ini_options]

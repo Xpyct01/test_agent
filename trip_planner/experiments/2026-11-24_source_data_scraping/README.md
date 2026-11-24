@@ -50,7 +50,7 @@ notes from the park itself.
 
 ```powershell
 uv sync --group experiments
-dvc pull        # once a DVC remote is configured
+uv run --group experiments dvc pull   # MinIO remote setup: ../README.md#data-dvc
 uv run --group experiments python -m trip_planner.experiments.2026-11-24_source_data_scraping.scripts.scrape
 ```
 
@@ -63,4 +63,5 @@ Afterwards:
 ```powershell
 dvc add trip_planner/experiments/data/picos_trails trip_planner/experiments/data/hiking_gear
 git add trip_planner/experiments/data/*.dvc trip_planner/experiments/data/.gitignore
+dvc push
 ```
