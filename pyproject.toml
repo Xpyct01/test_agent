@@ -1,0 +1,30 @@
+[project]
+name = "trip-planner"
+version = "0.1.0"
+description = "Two-agent LangGraph simulation that plans mountain trips to Picos de Europa."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi",
+    "httpx",
+    "langchain-core",
+    "langchain-openai",
+    "langfuse",
+    "langgraph",
+    "pydantic",
+    "pydantic-settings",
+    "pyyaml",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["trip_planner/unit_test"]
+
+[tool.uv]
+package = false

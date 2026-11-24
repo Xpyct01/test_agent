@@ -1,0 +1,14 @@
+[
+  {"item_id": "hiking_boots", "name": "Hiking boots", "aliases": ["boots", "hiking boots", "trekking boots", "hiking shoes"], "required_when": "always", "rentable": true, "rental_price_eur": 8.0},
+  {"item_id": "backpack", "name": "Day backpack", "aliases": ["backpack", "rucksack", "daypack", "day pack", "bag"], "required_when": "always", "rentable": true, "rental_price_eur": 5.0},
+  {"item_id": "water_2l", "name": "2 litres of water", "aliases": ["water", "water bottle", "hydration", "bottle"], "required_when": "always", "rentable": false},
+  {"item_id": "sun_protection", "name": "Sunscreen and sunglasses", "aliases": ["sunscreen", "sunglasses", "sun cream", "sun protection"], "required_when": "always", "rentable": false},
+  {"item_id": "first_aid_kit", "name": "Personal first aid kit", "aliases": ["first aid", "first aid kit", "medkit"], "required_when": "always", "rentable": false},
+  {"item_id": "map_or_gps", "name": "Map or GPS device", "aliases": ["map", "gps", "compass"], "required_when": "always", "rentable": true, "rental_price_eur": 6.0},
+  {"item_id": "rain_jacket", "name": "Waterproof jacket", "aliases": ["rain jacket", "raincoat", "waterproof", "waterproof jacket", "shell"], "required_when": "rain", "rentable": true, "rental_price_eur": 6.0},
+  {"item_id": "warm_layer", "name": "Warm fleece or down layer", "aliases": ["fleece", "warm layer", "down jacket", "sweater", "jumper"], "required_when": "cold", "rentable": true, "rental_price_eur": 5.0},
+  {"item_id": "sun_hat", "name": "Sun hat", "aliases": ["hat", "cap", "sun hat"], "required_when": "hot", "rentable": false},
+  {"item_id": "trekking_poles", "name": "Trekking poles", "aliases": ["poles", "trekking poles", "hiking poles", "sticks"], "required_when": "joint_issues", "rentable": true, "rental_price_eur": 4.0},
+  {"item_id": "helmet", "name": "Climbing helmet", "aliases": ["helmet", "climbing helmet"], "required_when": "rockfall", "rentable": true, "rental_price_eur": 5.0},
+  {"item_id": "headlamp", "name": "Headlamp", "aliases": ["headlamp", "head torch", "torch", "flashlight"], "required_when": "long_day", "rentable": true, "rental_price_eur": 3.0}
+]

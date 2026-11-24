@@ -221,3 +221,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Simulation outputs (keep the committed example trajectory).
+trajectories/*
+!trajectories/example_success.json
+!trajectories/example_summary.json
