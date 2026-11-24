@@ -14,6 +14,7 @@ dependencies = [
     "langchain-openai",
     "langfuse",
     "langgraph",
+    "minio>=7.2.20",
     "pydantic",
     "pydantic-settings",
     "pyyaml",

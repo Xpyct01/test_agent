@@ -76,6 +76,10 @@ services:
       TRIP_SIMULATION_OUTPUT_DIR: /srv/trajectories
       TRIP_DATABASE_HOST: trip-planner-postgres
       TRIP_DATABASE_PORT: "5432"
+      # Source data CSV files indexed by POST /indexing.
+      TRIP_STORAGE_ENDPOINT: minio:9000
+      TRIP_STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      TRIP_STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
     volumes:
       - ./trajectories:/srv/trajectories
     depends_on:
@@ -192,8 +196,9 @@ services:
     image: cgr.dev/chainguard/minio
     restart: unless-stopped
     entrypoint: sh
-    # Creates the langfuse bucket and the DVC remote bucket before starting the server.
-    command: -c 'mkdir -p /data/langfuse /data/dvc && minio server --address ":9000" --console-address ":9001" /data'
+    # Creates the langfuse bucket, the DVC remote bucket and the trip planner's
+    # source data bucket (TRIP_STORAGE_BUCKET) before starting the server.
+    command: -c 'mkdir -p /data/langfuse /data/dvc /data/${TRIP_STORAGE_BUCKET:-trip-planner-data} && minio server --address ":9000" --console-address ":9001" /data'
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
