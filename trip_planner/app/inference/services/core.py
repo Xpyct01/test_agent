@@ -21,6 +21,7 @@ from trip_planner.app.core.repositories.local_store import (
     scenario as scenario_lib,
 )
 from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.inference.services import agui as agui_lib
 from trip_planner.app.inference.services import simulation as simulation_lib
 from trip_planner.app.ml.environment import run_context as run_context_lib
 from trip_planner.app.ml.equipment_check import core as equipment_check_lib
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass
 class _Runtime:
     simulation: simulation_lib.SimulationService
+    agui: agui_lib.AgUiService
     weather_forecast: forecast_lib.AbstractWeatherForecast
     observability: observability_lib.ObservabilityCallbacks
 
@@ -46,6 +48,7 @@ class InferenceService:
 
     Attributes:
         simulation: Runs and reads simulation batches.
+        agui: Streams live runs to the UI over AG-UI.
     """
 
     def __init__(self, runtime: _Runtime):
@@ -55,6 +58,7 @@ class InferenceService:
             runtime: The built components.
         """
         self.simulation = runtime.simulation
+        self.agui = runtime.agui
         self._weather_forecast = runtime.weather_forecast
         self._observability = runtime.observability
 
@@ -141,6 +145,7 @@ def _build_runtime(configuration: config.Configuration) -> _Runtime:
     )
     return _Runtime(
         simulation=simulation_service,
+        agui=agui_lib.AgUiService(simulation_service, simulation_config),
         weather_forecast=weather_forecast,
         observability=observability,
     )

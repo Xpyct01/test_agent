@@ -5,6 +5,7 @@ description = "Two-agent LangGraph simulation that plans mountain trips to Picos
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "ag-ui-protocol>=1.0.0",
     "fastapi",
     "httpx",
     "langchain-core",

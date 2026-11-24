@@ -31,6 +31,7 @@ from trip_planner.app.core.schemas import api
 from trip_planner.app.core.schemas import simulation
 from trip_planner.app.ml.environment import core as environment_lib
 from trip_planner.app.ml.environment import message_bus as message_bus_lib
+from trip_planner.app.ml.environment import participant as participant_lib
 from trip_planner.app.ml.environment import run_context as run_context_lib
 from trip_planner.app.ml.environment import trajectory as trajectory_lib
 from trip_planner.app.ml.evaluation import core as evaluation_lib
@@ -39,9 +40,10 @@ from trip_planner.app.ml.simulated_human import core as simulated_human_lib
 
 logger = logging.getLogger(__name__)
 
-_CUSTOMER_ID = 'human_a'
+CUSTOMER_ID = 'human_a'
 _GUIDE_ID = 'human_b'
 _SUMMARY_FILE = 'summary.json'
+_LIVE_DIR = 'live'
 _BATCH_ID_PATTERN = re.compile(r'^batch-[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$')
 
 
@@ -85,6 +87,11 @@ class SimulationService:
         self._simulation_config = simulation_config
         self._agents_config = agents_config
 
+    @property
+    def run_context_provider(self) -> run_context_lib.RunContextProvider:
+        """Makes the active run visible to tools and participants."""
+        return self._run_context_provider
+
     async def run_batch(
         self, request: api.SimulationRequest
     ) -> api.SimulationResponse:
@@ -94,13 +101,10 @@ class SimulationService:
             errors.InvalidRequestError: The scenario does not exist.
         """
         scenario = self._scenario_repository.load(request.scenario)
-        now = datetime.datetime.now()
-        batch_id = (
-            f'batch-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}'
-        )
+        batch_id = self.new_batch_id()
         batch_dir = self._simulation_config.output_dir / batch_id
         await asyncio.to_thread(batch_dir.mkdir, parents=True, exist_ok=True)
-        planning_date = scenario.start_date or now.date()
+        planning_date = scenario.start_date or datetime.date.today()
         logger.info(
             'Batch %s: %d runs of %r, planning date %s',
             batch_id, request.runs, scenario.name, planning_date,
@@ -108,9 +112,9 @@ class SimulationService:
 
         trajectories, files = [], []
         for run_index in range(request.runs):
-            trajectory = await self._run_once(
-                batch_id, run_index, scenario, planning_date
-            )
+            trajectory = await self.build_run(
+                batch_id, run_index, scenario
+            ).run()
             path = batch_dir / f'run_{run_index}.json'
             await asyncio.to_thread(
                 path.write_text, trajectory.model_dump_json(indent=2),
@@ -162,15 +166,40 @@ class SimulationService:
             summary=summary, trajectories=trajectories
         )
 
-    async def _run_once(
+    def load_scenario(self, name: str | None) -> simulation.Scenario:
+        """Returns a scenario by file stem, or the default one.
+
+        Raises:
+            errors.InvalidRequestError: The scenario does not exist.
+        """
+        return self._scenario_repository.load(name)
+
+    def new_batch_id(self, prefix: str = 'batch') -> str:
+        """Returns a fresh, time-ordered batch id."""
+        now = datetime.datetime.now()
+        return f'{prefix}-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}'
+
+    def build_run(
         self,
         batch_id: str,
         run_index: int,
         scenario: simulation.Scenario,
-        planning_date: datetime.date,
-    ) -> simulation.Trajectory:
+        customer: participant_lib.Participant | None = None,
+    ) -> environment_lib.Simulation:
+        """Builds one run of a scenario, ready to `run()`.
+
+        Args:
+            batch_id: Batch the run belongs to.
+            run_index: Position in the batch; picks the fault seed.
+            scenario: The scenario to play.
+            customer: Who plays Human A; the simulated persona if omitted.
+
+        Returns:
+            The simulation; its `run_context` can be observed before it runs.
+        """
         config = self._simulation_config
         fault_seed = config.base_seed + run_index
+        planning_date = scenario.start_date or datetime.date.today()
         context = run_context_lib.RunContext(
             run_id=f'{batch_id}-run{run_index}',
             batch_id=batch_id,
@@ -195,16 +224,31 @@ class SimulationService:
             ),
         )
         humans = [
-            self._human(_CUSTOMER_ID, 'agent_a', scenario.customer, True),
+            customer
+            or self._human(CUSTOMER_ID, 'agent_a', scenario.customer, True),
             self._human(_GUIDE_ID, 'agent_b', scenario.guide, False),
         ]
-        return await environment_lib.Simulation(
+        return environment_lib.Simulation(
             participants=[*self._agents, *humans],
-            initiators=[_CUSTOMER_ID, _GUIDE_ID],
+            initiators=[CUSTOMER_ID, _GUIDE_ID],
             run_context=context,
             run_context_provider=self._run_context_provider,
             max_ticks=config.max_ticks,
-        ).run()
+        )
+
+    async def save_live_trajectory(
+        self, trajectory: simulation.Trajectory
+    ) -> pathlib.Path:
+        """Writes the trajectory of a live run under `<output_dir>/live/`."""
+        live_dir = self._simulation_config.output_dir / _LIVE_DIR
+        await asyncio.to_thread(live_dir.mkdir, parents=True, exist_ok=True)
+        path = live_dir / f'{trajectory.run_id}.json'
+        await asyncio.to_thread(
+            path.write_text, trajectory.model_dump_json(indent=2),
+            encoding='utf-8',
+        )
+        self._observability.flush()
+        return path
 
     def _human(
         self,

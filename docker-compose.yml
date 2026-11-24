@@ -1,10 +1,12 @@
-# Local stack: the trip planner API plus a self-hosted Langfuse v3.
+# Local stack: the trip planner API, its AG-UI frontend and a self-hosted
+# Langfuse v3.
 #
 #   docker compose up -d                 # everything
 #   docker compose up -d langfuse-web    # Langfuse only (run the app with uv)
 #
-# Langfuse UI: http://localhost:3000. Its login and API keys (below) are
-# created on first start. Host ports: LANGFUSE_PORT (3000), MINIO_PORT (9090),
+# Frontend: http://localhost:8080. Langfuse UI: http://localhost:3000. Its
+# login and API keys (below) are created on first start. Host ports:
+# FRONTEND_PORT (8080), LANGFUSE_PORT (3000), MINIO_PORT (9090),
 # TRIP_PLANNER_PORT (8000). MinIO also hosts the DVC remote (bucket `dvc`,
 # see trip_planner/experiments/README.md). The defaults are for local development only:
 # override them in the root .env before exposing this stack anywhere.
@@ -72,6 +74,16 @@ services:
       - ./trajectories:/srv/trajectories
     depends_on:
       langfuse-web:
+        condition: service_started
+
+  frontend:
+    build:
+      context: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      trip-planner:
         condition: service_started
 
   langfuse-web:

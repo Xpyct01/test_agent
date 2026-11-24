@@ -35,6 +35,9 @@ class SimulationConfiguration(base.ConfigurationSection):
         data_dir: Directory with the trails, equipment and calendar data.
         scenario_path: Scenario used when a request names none.
         output_dir: Directory the trajectories and summaries are written to.
+        live_input_timeout_s: How long a live (AG-UI) run waits for the
+            user's next message before it gives up and stalls.
+        max_live_runs: Live runs allowed at the same time.
     """
 
     model_config = pydantic_settings.SettingsConfigDict(
@@ -52,3 +55,5 @@ class SimulationConfiguration(base.ConfigurationSection):
     data_dir: pathlib.Path = _DATA_DIR
     scenario_path: pathlib.Path = _DATA_DIR / 'scenarios' / 'default.yaml'
     output_dir: pathlib.Path = pathlib.Path('trajectories')
+    live_input_timeout_s: float = 1800.0
+    max_live_runs: int = 20
