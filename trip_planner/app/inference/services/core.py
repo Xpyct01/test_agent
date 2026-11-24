@@ -17,18 +17,20 @@ from trip_planner.app.core.clients import database as database_lib
 from trip_planner.app.core.clients import storage as storage_lib
 from trip_planner.app.core.providers import source_data as source_data_lib
 from trip_planner.app.core.repositories.local_store import (
-    equipment as equipment_lib,
-)
-from trip_planner.app.core.repositories.local_store import guide as guide_lib
-from trip_planner.app.core.repositories.local_store import (
     scenario as scenario_lib,
 )
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import (
+    equipment_item as equipment_item_db_lib,
+)
 from trip_planner.app.core.repositories.postgres import (
     gear_category as gear_category_db_lib,
 )
 from trip_planner.app.core.repositories.postgres import (
     gear_product as gear_product_db_lib,
+)
+from trip_planner.app.core.repositories.postgres import guide as guide_db_lib
+from trip_planner.app.core.repositories.postgres import (
+    rental_stock as rental_stock_db_lib,
 )
 from trip_planner.app.core.repositories.postgres import trail as trail_db_lib
 from trip_planner.app.inference.services import agui as agui_lib
@@ -102,13 +104,13 @@ class InferenceService:
 def _build_runtime(configuration: config.Configuration) -> _Runtime:
     simulation_config = configuration.simulation
     agents_config = configuration.agents
-    data_dir = simulation_config.data_dir
 
-    trail_repository = trail_lib.TrailRepository(data_dir / 'trails.json')
-    equipment_repository = equipment_lib.EquipmentRepository(
-        data_dir / 'equipment.json'
+    database = database_lib.DatabaseClient(configuration.database)
+    trail_repository = trail_db_lib.TrailRepository(database)
+    equipment_repository = equipment_item_db_lib.EquipmentItemRepository(
+        database
     )
-    guide_repository = guide_lib.GuideRepository(data_dir / 'guides.json')
+    guide_repository = guide_db_lib.GuideRepository(database)
     scenario_repository = scenario_lib.ScenarioRepository(
         simulation_config.scenario_path
     )
@@ -162,11 +164,13 @@ def _build_runtime(configuration: config.Configuration) -> _Runtime:
         run_context_provider=run_context_provider,
         observability=observability,
         scenario_repository=scenario_repository,
+        rental_stock_repository=rental_stock_db_lib.RentalStockRepository(
+            database
+        ),
         evaluator=evaluation_lib.BatchEvaluator(),
         simulation_config=simulation_config,
         agents_config=agents_config,
     )
-    database = database_lib.DatabaseClient(configuration.database)
     return _Runtime(
         simulation=simulation_service,
         agui=agui_lib.AgUiService(simulation_service, simulation_config),

@@ -130,6 +130,7 @@ def build_service(tmp_path, provider, tool_set, human_turns, failure_rates=None)
         run_context_provider=provider,
         observability=observability,
         scenario_repository=scenario_lib.ScenarioRepository(scenario_path),
+        rental_stock_repository=fakes.FakeRentalStockRepository(),
         evaluator=evaluation_lib.BatchEvaluator(),
         simulation_config=fakes.simulation_config(
             output_dir=tmp_path / 'out',

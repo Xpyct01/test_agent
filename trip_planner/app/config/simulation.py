@@ -32,7 +32,6 @@ class SimulationConfiguration(base.ConfigurationSection):
             reports the failure to the LLM.
         retry_base_delay_s: First back-off delay between attempts; doubles
             on each retry.
-        data_dir: Directory with the trails, equipment and calendar data.
         scenario_path: Scenario used when a request names none.
         output_dir: Directory the trajectories and summaries are written to.
         live_input_timeout_s: How long a live (AG-UI) run waits for the
@@ -52,7 +51,6 @@ class SimulationConfiguration(base.ConfigurationSection):
     )
     max_tool_attempts: int = 3
     retry_base_delay_s: float = 0.2
-    data_dir: pathlib.Path = _DATA_DIR
     scenario_path: pathlib.Path = _DATA_DIR / 'scenarios' / 'default.yaml'
     output_dir: pathlib.Path = pathlib.Path('trajectories')
     live_input_timeout_s: float = 1800.0

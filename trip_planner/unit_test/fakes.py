@@ -1,8 +1,9 @@
-"""Test doubles: scripted LLMs and a ready-made run context."""
+"""Test doubles: scripted LLMs, the catalogue and a ready-made run context."""
 
 from collections.abc import Iterable, Sequence
 import datetime
 import itertools
+import json
 import pathlib
 from typing import Any
 
@@ -28,6 +29,8 @@ from trip_planner.app.ml.environment import trajectory as trajectory_lib
 from trip_planner.app.ml.fault_injection import core as fault_injection_lib
 
 DATA_DIR = pathlib.Path(__file__).resolve().parents[1] / 'data'
+# The catalogue the seed migration writes to PostgreSQL, as test fixtures.
+CATALOGUE_DIR = pathlib.Path(__file__).resolve().parent / 'data'
 # A Wednesday; with the weather fixture the best date is Sunday 29th.
 PLANNING_DATE = datetime.date(2026, 11, 25)
 _call_ids = itertools.count()
@@ -84,12 +87,70 @@ class ScriptedHumanModel:
         return {'parsed': next(self._turns), 'raw': messages_lib.AIMessage('')}
 
 
+def _load(name: str) -> Any:
+    return json.loads((CATALOGUE_DIR / name).read_text(encoding='utf-8'))
+
+
+class FakeTrailRepository:
+    """Serves `trails.json` like the Postgres `TrailRepository`."""
+
+    def __init__(self):
+        self._trails = {
+            raw['trail_id']: trip.Trail.model_validate(raw)
+            for raw in _load('trails.json')
+        }
+
+    async def list_all(self) -> list[trip.Trail]:
+        return list(self._trails.values())
+
+    async def get(self, trail_id: str) -> trip.Trail | None:
+        return self._trails.get(trail_id)
+
+
+class FakeEquipmentItemRepository:
+    """Serves `equipment.json` like the Postgres `EquipmentItemRepository`."""
+
+    def __init__(self):
+        self._items = [
+            trip.EquipmentItem.model_validate(raw)
+            for raw in _load('equipment.json')
+        ]
+
+    async def list_all(self) -> list[trip.EquipmentItem]:
+        return list(self._items)
+
+
+class FakeGuideRepository:
+    """Serves `guides.json` like the Postgres `GuideRepository`."""
+
+    def __init__(self):
+        self._guides = [
+            trip.Guide.model_validate(raw) for raw in _load('guides.json')
+        ]
+
+    async def list_all(self) -> list[trip.Guide]:
+        return list(self._guides)
+
+    async def get(self, name: str) -> trip.Guide | None:
+        wanted = name.strip().lower()
+        return next(
+            (g for g in self._guides if g.name.lower() == wanted), None
+        )
+
+
+class FakeRentalStockRepository:
+    """Serves `rental_stock.json` like the Postgres `RentalStockRepository`."""
+
+    async def units_by_item(self) -> dict[str, int]:
+        return dict(_load('rental_stock.json'))
+
+
 def run_context(
     failure_rates: dict[str, float] | None = None,
     closures: Sequence[trip.TrailClosure] = (),
     seed: int = 0,
 ) -> run_context_lib.RunContext:
-    """Returns a run context over the real data files."""
+    """Returns a run context over the catalogue fixtures."""
     persona = simulation.Persona(
         name='x', description='x', initial_message='hello'
     )
@@ -112,7 +173,7 @@ def run_context(
         trail_status=trail_status_lib.TrailStatusRepository(closures),
         bookings=booking_lib.BookingRepository(),
         rental_stock=rental_stock_lib.RentalStockRepository(
-            DATA_DIR / 'rental_stock.json'
+            _load('rental_stock.json')
         ),
     )
 

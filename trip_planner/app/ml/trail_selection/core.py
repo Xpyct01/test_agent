@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import trail as trail_lib
 from trip_planner.app.core.schemas import trip
 
 _INTEREST_SYNONYMS = {
@@ -32,7 +32,7 @@ class TrailSelection:
         """
         self._trail_repository = trail_repository
 
-    def select(
+    async def select(
         self,
         max_distance_km: float,
         max_elevation_gain_m: int,
@@ -52,9 +52,11 @@ class TrailSelection:
         """
         wanted = {_normalize(i) for i in interests if i.strip()}
         options, excluded = [], 0
-        for trail in self._trail_repository.list_all():
+        for trail in await self._trail_repository.list_all():
             if (
                 trail.distance_km > max_distance_km
+                # An unknown ascent cannot be shown to be within the limits.
+                or trail.elevation_gain_m is None
                 or trail.elevation_gain_m > max_elevation_gain_m
                 or trip.DIFFICULTY_ORDER[trail.difficulty]
                 > trip.DIFFICULTY_ORDER[max_difficulty]

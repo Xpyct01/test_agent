@@ -21,7 +21,7 @@ class TrailSummary(pydantic.BaseModel):
     trail_id: str
     name: str
     distance_km: float
-    elevation_gain_m: int
+    elevation_gain_m: int | None
     duration_h: float
     difficulty: str
     highlights: list[str]
