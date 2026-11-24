@@ -1,6 +1,7 @@
 """Records the events of one run and turns them into a trajectory."""
 
 import collections
+from collections.abc import Callable
 import datetime
 import time
 from typing import Any
@@ -24,7 +25,14 @@ class TrajectoryRecorder:
         self._input_cost = input_cost_per_million
         self._output_cost = output_cost_per_million
         self._events: list[simulation.TrajectoryEvent] = []
+        self._listeners: list[Callable[[simulation.TrajectoryEvent], None]] = []
         self._started = time.perf_counter()
+
+    def subscribe(
+        self, listener: Callable[[simulation.TrajectoryEvent], None]
+    ) -> None:
+        """Calls `listener` with every event recorded from now on."""
+        self._listeners.append(listener)
 
     def record(
         self,
@@ -33,12 +41,13 @@ class TrajectoryRecorder:
         participant: str,
         **data: Any,
     ) -> None:
-        """Appends one event."""
-        self._events.append(
-            simulation.TrajectoryEvent(
-                tick=tick, type=event_type, participant=participant, data=data
-            )
+        """Appends one event and passes it to the listeners."""
+        event = simulation.TrajectoryEvent(
+            tick=tick, type=event_type, participant=participant, data=data
         )
+        self._events.append(event)
+        for listener in self._listeners:
+            listener(event)
 
     def build(
         self,

@@ -1,0 +1,22 @@
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    # AG-UI streams server-sent events: no buffering, long reads.
+    location /agui {
+        proxy_pass ${TRIP_API_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    location /health {
+        proxy_pass ${TRIP_API_URL};
+    }
+}

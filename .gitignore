@@ -226,3 +226,7 @@ __marimo__/
 trajectories/*
 !trajectories/example_success.json
 !trajectories/example_summary.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

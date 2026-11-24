@@ -102,7 +102,8 @@ def _operations_script():
     ]
 
 
-async def test_scenario_converges(tmp_path, provider, tool_set):
+def build_service(tmp_path, provider, tool_set, human_turns, failure_rates=None):
+    """Returns a simulation service over the scripted agents and humans."""
     observability = observability_lib.ObservabilityCallbacks(
         observability_config_lib.ObservabilityConfiguration(enabled=False)
     )
@@ -116,11 +117,6 @@ async def test_scenario_converges(tmp_path, provider, tool_set):
             chat_model=fakes.scripted_model(_operations_script()),
             checkpointer=memory.InMemorySaver(), **common),
     ]
-    humans_model = fakes.ScriptedHumanModel([
-        simulation.HumanTurn(message='Approved. Helmet required, meet 08:00.',
-                             conversation_complete=False),
-        simulation.HumanTurn(message='Thanks!', conversation_complete=True),
-    ])
     scenario_path = tmp_path / 'pinned.yaml'
     scenario_path.write_text(
         (fakes.DATA_DIR / 'scenarios' / 'default.yaml').read_text(
@@ -128,19 +124,33 @@ async def test_scenario_converges(tmp_path, provider, tool_set):
                 'start_date: null', f'start_date: {fakes.PLANNING_DATE}'),
         encoding='utf-8',
     )
-    service = simulation_lib.SimulationService(
+    return simulation_lib.SimulationService(
         agents=agents,
-        human_chat_model=humans_model,
+        human_chat_model=fakes.ScriptedHumanModel(human_turns),
         run_context_provider=provider,
         observability=observability,
         scenario_repository=scenario_lib.ScenarioRepository(scenario_path),
         evaluator=evaluation_lib.BatchEvaluator(),
         simulation_config=fakes.simulation_config(
             output_dir=tmp_path / 'out',
-            failure_rates={'get_trail_status': 0.9},
+            failure_rates=failure_rates or {},
             max_tool_attempts=10,
         ),
         agents_config=agents_config_lib.AgentsConfiguration(),
+    )
+
+
+APPROVAL = simulation.HumanTurn(
+    message='Approved. Helmet required, meet 08:00.',
+    conversation_complete=False,
+)
+THANKS = simulation.HumanTurn(message='Thanks!', conversation_complete=True)
+
+
+async def test_scenario_converges(tmp_path, provider, tool_set):
+    service = build_service(
+        tmp_path, provider, tool_set, [APPROVAL, THANKS],
+        failure_rates={'get_trail_status': 0.9},
     )
 
     response = await service.run_batch(api.SimulationRequest(runs=1))
