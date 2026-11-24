@@ -44,7 +44,16 @@ uv run uvicorn trip_planner.app.service_launcher:app
 
 ### Langfuse (optional)
 
-Use Langfuse Cloud, or self-host it with the official compose file (`git clone https://github.com/langfuse/langfuse && cd langfuse && docker compose up`). Then set `TRIP_OBSERVABILITY_LANGFUSE_PUBLIC_KEY`, `..._SECRET_KEY` and `..._HOST`.
+The root [`docker-compose.yml`](docker-compose.yml) runs the API together with a self-hosted Langfuse v3 (web, worker, Postgres, ClickHouse, Redis, MinIO):
+
+```powershell
+docker compose up -d                  # API on :8000, Langfuse on :3000
+docker compose up -d langfuse-web     # Langfuse only; run the app with uv
+```
+
+On first start Langfuse creates a project with fixed API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) and an admin user (`admin@example.com` / `admin12345`), and the `trip-planner` container is already pointed at it. To trace runs started with `uv` against this Langfuse, put those keys in `.env` with `TRIP_OBSERVABILITY_LANGFUSE_HOST=http://localhost:3000`. These defaults are for local use only; override them (`LANGFUSE_INIT_*`, `LANGFUSE_ENCRYPTION_KEY`, `LANGFUSE_SALT`, `LANGFUSE_NEXTAUTH_SECRET`, database passwords) in `.env` before exposing the stack. If a port is taken, change it with `LANGFUSE_PORT` (3000), `MINIO_PORT` (9090) or `TRIP_PLANNER_PORT` (8000). `docker compose down -v` wipes the Langfuse data.
+
+You can also use Langfuse Cloud: set `TRIP_OBSERVABILITY_LANGFUSE_PUBLIC_KEY`, `..._SECRET_KEY` and `..._HOST`.
 
 In Langfuse:
 - every run is one **session** (`<batch_id>-run<i>`);
