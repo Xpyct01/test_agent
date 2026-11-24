@@ -47,6 +47,11 @@ class Simulation:
         self._provider = run_context_provider
         self._max_ticks = max_ticks
 
+    @property
+    def run_context(self) -> run_context_lib.RunContext:
+        """State of this run."""
+        return self._context
+
     async def run(self) -> simulation.Trajectory:
         """Plays the run and returns its trajectory."""
         context = self._context

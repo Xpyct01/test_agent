@@ -1,14 +1,17 @@
-# Local stack: the trip planner API, its own PostgreSQL and a self-hosted Langfuse v3.
+# Local stack: the trip planner API, its AG-UI frontend, its own PostgreSQL
+# and a self-hosted Langfuse v3.
 #
 #   docker compose up -d                 # everything
 #   docker compose up -d langfuse-web    # Langfuse only (run the app with uv)
 #   docker compose up -d trip-planner-postgres && uv run alembic upgrade head
 #                                        # app database only, migrated from the host
 #
-# Langfuse UI: http://localhost:3000. Its login and API keys (below) are
-# created on first start. Host ports: LANGFUSE_PORT (3000), MINIO_PORT (9090),
+# Frontend: http://localhost:8080. Langfuse UI: http://localhost:3000. Its
+# login and API keys (below) are created on first start. Host ports:
+# FRONTEND_PORT (8080), LANGFUSE_PORT (3000), MINIO_PORT (9090),
 # TRIP_PLANNER_PORT (8000), TRIP_DATABASE_PORT (5433). The app database
-# (trip-planner-postgres) is a separate server from Langfuse's `postgres`. MinIO also hosts the DVC remote (bucket `dvc`,
+# (trip-planner-postgres) is a separate server from Langfuse's `postgres`.
+# MinIO also hosts the DVC remote (bucket `dvc`,
 # see trip_planner/experiments/README.md). The defaults are for local development only:
 # override them in the root .env before exposing this stack anywhere.
 
@@ -114,6 +117,16 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
+
+  frontend:
+    build:
+      context: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      trip-planner:
+        condition: service_started
 
   langfuse-web:
     image: docker.io/langfuse/langfuse:3

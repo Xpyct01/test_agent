@@ -9,7 +9,7 @@ Human A (customer) ⇄ Agent A (customer assistant) ⇄ Agent B (operations assi
 - **Agent A** picks a trail that fits the customer's health and interests, finds the days with the best weather and checks the gear.
 - **Agent B** runs the company side: trail closures, guide availability, the booking and gear rental. Human B must approve every trip.
 
-Stack: **LangGraph** (agents), **OpenAI** (LLM), **Open-Meteo** (live weather), **Langfuse** (tracing), **FastAPI** and a **CLI** (entrypoints). Python 3.12, managed with `uv`.
+Stack: **LangGraph** (agents), **OpenAI** (LLM), **Open-Meteo** (live weather), **Langfuse** (tracing), **FastAPI** and a **CLI** (entrypoints), a **React** frontend over **AG-UI**. Python 3.12, managed with `uv`.
 
 ---
 
@@ -18,7 +18,7 @@ Stack: **LangGraph** (agents), **OpenAI** (LLM), **Open-Meteo** (live weather), 
 ```powershell
 uv sync                                   # install
 copy .env.example .env                    # then set TRIP_OPENAI_API_KEY
-uv run pytest                             # 25 tests, no API key needed
+uv run pytest                             # 29 tests, no API key needed
 uv run python -m trip_planner.app.simulation_launcher --runs 5
 ```
 
@@ -40,14 +40,41 @@ uv run uvicorn trip_planner.app.service_launcher:app
 - `GET /health/live`, `GET /health/ready`
 - `POST /simulations` with body `{"runs": 1, "scenario": null}`. Returns the summary and every trajectory. The call is synchronous: a run takes about 30–60 s.
 - `GET /simulations/{batch_id}` returns a stored batch.
+- `POST /agui` streams a live run over AG-UI (see [Frontend](#frontend-ag-ui)).
 - Docker: `docker build -f trip_planner/Dockerfile -t trip-planner .`, then `docker run -p 8000:8000 --env-file .env trip-planner`.
+
+### Frontend (AG-UI)
+
+[`frontend/`](frontend) is a React app that talks to the API over the [AG-UI protocol](https://docs.ag-ui.com) (`@ag-ui/client` → `POST /agui`, server-sent events). It has two modes:
+
+- **Watch a simulation:** plays one full run with both simulated humans and streams it live: every message between the four participants, every tool call with its arguments and result, injected faults and retries, the tick, live token counts and the final plan.
+- **Play the customer:** you are Human A. Agent A, Agent B and the simulated guide run as usual. The simulation pauses whenever Agent A's reply reaches you, and goes on when you answer. Once a plan is delivered, **Accept plan & finish** ends the run as `converged`.
+
+```powershell
+uv run uvicorn trip_planner.app.service_launcher:app   # API on :8000
+cd frontend; npm install; npm run dev                  # UI on http://localhost:5173
+```
+
+The Vite dev server proxies `/agui` and `/health` to `TRIP_API_URL` (default `http://localhost:8000`). With `docker compose up -d` the UI is served by nginx on http://localhost:8080 (`FRONTEND_PORT`). Live runs are saved to `trajectories/live/<run_id>.json`.
+
+How the simulation maps onto AG-UI events ([`inference/services/agui.py`](trip_planner/app/inference/services/agui.py)):
+
+| Simulation | AG-UI |
+|---|---|
+| tick | `STEP_STARTED` / `STEP_FINISHED` (`tick N`) |
+| message | `TEXT_MESSAGE_START/CONTENT/END`; `name` is the sender, `metadata.recipient` the recipient |
+| tool call and result | `TOOL_CALL_START/ARGS/END`, `TOOL_CALL_RESULT`; `metadata.participant` is the agent (`send_message` is shown as the message itself) |
+| tick, status, live metrics, final plan, incidents | shared state: `STATE_SNAPSHOT`, then JSON Patch `STATE_DELTA` |
+| waiting for you (play mode) | `RUN_FINISHED` with `result.status = "awaiting_input"` |
+
+`forwardedProps` sets `mode` (`watch` | `play`), `scenario` and, in play mode, `conversationComplete`. A play run lives in memory per `threadId`; it gives up after `TRIP_SIMULATION_LIVE_INPUT_TIMEOUT_S` (30 min) without a reply, and at most `TRIP_SIMULATION_MAX_LIVE_RUNS` (20) live runs exist at once. A watch run is cancelled when the browser disconnects.
 
 ### Langfuse (optional)
 
 The root [`docker-compose.yml`](docker-compose.yml) runs the API together with a self-hosted Langfuse v3 (web, worker, Postgres, ClickHouse, Redis, MinIO):
 
 ```powershell
-docker compose up -d                  # API on :8000, Langfuse on :3000
+docker compose up -d                  # API on :8000, UI on :8080, Langfuse on :3000
 docker compose up -d langfuse-web     # Langfuse only; run the app with uv
 ```
 
@@ -278,6 +305,7 @@ The repositories still read `trip_planner/data/`. Moving them to the database is
 ## Code layout
 
 ```
+frontend/                   React + @ag-ui/client UI (Vite; nginx image for compose)
 trip_planner/
   data/                     trails, gear, guides, rental stock, weather fixture, scenarios
   app/
@@ -287,9 +315,9 @@ trip_planner/
     config/                 settings sections
     core/                   errors, schemas, repositories/local_store, sql_models, migrations
     inference/              routers + services (InferenceService, SimulationService)
-    ml/                     environment, fault_injection, simulated_human, weather_forecast,
+    ml/                     environment, fault_injection, simulated_human, live_human, weather_forecast,
                             fitness_assessment, trail_selection, equipment_check, evaluation
-  unit_test/                25 tests, incl. a scripted end-to-end run
+  unit_test/                29 tests, incl. a scripted end-to-end run
 ```
 
 The trail data is a small, simplified catalogue based on the national park's route list; distances and elevation gains are approximate.

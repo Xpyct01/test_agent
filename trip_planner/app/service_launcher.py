@@ -8,6 +8,7 @@ import logging
 import fastapi
 
 from trip_planner.app import config
+from trip_planner.app.inference.routers import agui
 from trip_planner.app.inference.routers import errors
 from trip_planner.app.inference.routers import health
 from trip_planner.app.inference.routers import simulations
@@ -15,7 +16,7 @@ from trip_planner.app.inference.routers import state
 
 logger = logging.getLogger(__name__)
 
-_ROUTERS = (health.router, simulations.router)
+_ROUTERS = (health.router, simulations.router, agui.router)
 
 
 async def _start(application_state: state.ApplicationState) -> None:

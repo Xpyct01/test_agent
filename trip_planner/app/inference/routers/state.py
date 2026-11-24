@@ -6,6 +6,7 @@ import typing
 import fastapi
 
 if typing.TYPE_CHECKING:
+    from trip_planner.app.inference.services import agui as agui_lib
     from trip_planner.app.inference.services import core as services_lib
     from trip_planner.app.inference.services import simulation as simulation_lib
 
@@ -38,3 +39,8 @@ def simulation_service(
 ) -> 'simulation_lib.SimulationService':
     """Returns the simulation request service."""
     return require_service(request).simulation
+
+
+def agui_service(request: fastapi.Request) -> 'agui_lib.AgUiService':
+    """Returns the AG-UI request service."""
+    return require_service(request).agui
