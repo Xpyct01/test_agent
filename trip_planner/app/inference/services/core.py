@@ -13,6 +13,9 @@ from trip_planner.app.agents.callbacks import observability as observability_lib
 from trip_planner.app.agents.customer_assistant import core as customer_lib
 from trip_planner.app.agents.operations_assistant import core as operations_lib
 from trip_planner.app.agents.tools import core as tools_lib
+from trip_planner.app.core.clients import database as database_lib
+from trip_planner.app.core.clients import storage as storage_lib
+from trip_planner.app.core.providers import source_data as source_data_lib
 from trip_planner.app.core.repositories.local_store import (
     equipment as equipment_lib,
 )
@@ -21,16 +24,30 @@ from trip_planner.app.core.repositories.local_store import (
     scenario as scenario_lib,
 )
 from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import (
+    gear_category as gear_category_db_lib,
+)
+from trip_planner.app.core.repositories.postgres import (
+    gear_product as gear_product_db_lib,
+)
+from trip_planner.app.core.repositories.postgres import trail as trail_db_lib
 from trip_planner.app.inference.services import agui as agui_lib
+from trip_planner.app.inference.services import indexing as indexing_lib
 from trip_planner.app.inference.services import simulation as simulation_lib
 from trip_planner.app.ml.environment import run_context as run_context_lib
 from trip_planner.app.ml.equipment_check import core as equipment_check_lib
 from trip_planner.app.ml.evaluation import core as evaluation_lib
 from trip_planner.app.ml.fitness_assessment import core as fitness_lib
+from trip_planner.app.ml.source_data_indexing import (
+    core as source_data_indexing_lib,
+)
 from trip_planner.app.ml.trail_selection import core as trail_selection_lib
 from trip_planner.app.ml.weather_forecast import abstract as forecast_lib
 from trip_planner.app.ml.weather_forecast import fixture as fixture_lib
 from trip_planner.app.ml.weather_forecast import open_meteo as open_meteo_lib
+from trip_planner.app.pipelines.source_data_indexing import (
+    core as source_data_pipeline_lib,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +56,8 @@ logger = logging.getLogger(__name__)
 class _Runtime:
     simulation: simulation_lib.SimulationService
     agui: agui_lib.AgUiService
+    indexing: indexing_lib.IndexingService
+    database: database_lib.DatabaseClient
     weather_forecast: forecast_lib.AbstractWeatherForecast
     observability: observability_lib.ObservabilityCallbacks
 
@@ -49,6 +68,7 @@ class InferenceService:
     Attributes:
         simulation: Runs and reads simulation batches.
         agui: Streams live runs to the UI over AG-UI.
+        indexing: Loads source data files from MinIO into the database.
     """
 
     def __init__(self, runtime: _Runtime):
@@ -59,6 +79,8 @@ class InferenceService:
         """
         self.simulation = runtime.simulation
         self.agui = runtime.agui
+        self.indexing = runtime.indexing
+        self._database = runtime.database
         self._weather_forecast = runtime.weather_forecast
         self._observability = runtime.observability
 
@@ -73,6 +95,7 @@ class InferenceService:
     async def close(self) -> None:
         """Closes every client and flushes the traces."""
         await self._weather_forecast.close()
+        await self._database.close()
         await asyncio.to_thread(self._observability.close)
 
 
@@ -143,11 +166,37 @@ def _build_runtime(configuration: config.Configuration) -> _Runtime:
         simulation_config=simulation_config,
         agents_config=agents_config,
     )
+    database = database_lib.DatabaseClient(configuration.database)
     return _Runtime(
         simulation=simulation_service,
         agui=agui_lib.AgUiService(simulation_service, simulation_config),
+        indexing=_indexing_service(
+            database, storage_lib.StorageClient(configuration.storage)
+        ),
+        database=database,
         weather_forecast=weather_forecast,
         observability=observability,
+    )
+
+
+def _indexing_service(
+    database: database_lib.DatabaseClient,
+    storage: storage_lib.StorageClient,
+) -> indexing_lib.IndexingService:
+    source_data_indexing = source_data_indexing_lib.SourceDataIndexing(
+        trail_repository=trail_db_lib.TrailRepository(database),
+        gear_category_repository=gear_category_db_lib.GearCategoryRepository(
+            database
+        ),
+        gear_product_repository=gear_product_db_lib.GearProductRepository(
+            database
+        ),
+    )
+    return indexing_lib.IndexingService(
+        source_data_pipeline_lib.SourceDataIndexingPipeline(
+            source_data_lib.SourceDataProvider(storage),
+            source_data_indexing,
+        )
     )
 
 

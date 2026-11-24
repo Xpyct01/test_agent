@@ -7,6 +7,7 @@ from trip_planner.app.config import database as database_lib
 from trip_planner.app.config import observability as observability_lib
 from trip_planner.app.config import openai as openai_lib
 from trip_planner.app.config import simulation as simulation_lib
+from trip_planner.app.config import storage as storage_lib
 from trip_planner.app.config import weather as weather_lib
 
 
@@ -19,6 +20,7 @@ class Configuration(pydantic.BaseModel):
         observability: Langfuse tracing.
         openai: OpenAI client.
         simulation: Discrete-time simulation.
+        storage: MinIO bucket of the source data files.
         weather: Weather forecast.
     """
 
@@ -38,6 +40,9 @@ class Configuration(pydantic.BaseModel):
     )
     simulation: simulation_lib.SimulationConfiguration = pydantic.Field(
         default_factory=simulation_lib.SimulationConfiguration
+    )
+    storage: storage_lib.StorageConfiguration = pydantic.Field(
+        default_factory=storage_lib.StorageConfiguration
     )
     weather: weather_lib.WeatherConfiguration = pydantic.Field(
         default_factory=weather_lib.WeatherConfiguration

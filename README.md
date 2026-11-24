@@ -41,6 +41,7 @@ uv run uvicorn trip_planner.app.service_launcher:app
 - `POST /simulations` with body `{"runs": 1, "scenario": null}`. Returns the summary and every trajectory. The call is synchronous: a run takes about 30–60 s.
 - `GET /simulations/{batch_id}` returns a stored batch.
 - `POST /agui` streams a live run over AG-UI (see [Frontend](#frontend-ag-ui)).
+- `POST /indexing` with body `{"trails_file": "trails.csv", "gear_items_file": "gear_items.csv"}` (either may be omitted) loads those CSV files from the MinIO source data bucket into the database and returns the rows written per table (see [Indexing source data](#indexing-source-data)).
 - Docker: `docker build -f trip_planner/Dockerfile -t trip-planner .`, then `docker run -p 8000:8000 --env-file .env trip-planner`.
 
 ### Frontend (AG-UI)
@@ -281,6 +282,7 @@ All settings are environment variables (or `.env`), grouped by section under `tr
 | `TRIP_WEATHER_` | `variant` (`open_meteo` \| `fixture`), coordinates, timeout |
 | `TRIP_OBSERVABILITY_` | Langfuse keys and host |
 | `TRIP_DATABASE_` | PostgreSQL of the app: host, port (5433), user, password, name, echo, pool size |
+| `TRIP_STORAGE_` | MinIO with the source data CSV files: endpoint (`localhost:9090`), access and secret key, `secure`, bucket (`trip-planner-data`) |
 
 ## Database (PostgreSQL, SQLModel, Alembic)
 
@@ -300,7 +302,23 @@ uv run alembic revision --autogenerate -m "describe the change"   # after editin
 | Bookings | `bookings`, `booking_rentals` | Content-derived booking id (idempotent retries). A partial unique index allows one confirmed booking per guide per day. |
 | Evaluation | `simulation_batches`, `simulation_runs`, `trajectory_events` | `Trajectory` / `BatchSummary` of each run, for convergence and drift queries |
 
-The repositories still read `trip_planner/data/`. Moving them to the database is a separate step.
+### Indexing source data
+
+`POST /indexing` reads CSV files from the MinIO bucket `TRIP_STORAGE_BUCKET` (default `trip-planner-data`; the compose MinIO creates it). The files have the columns of the DVC datasets: a trails file like `picos_trails/trails.csv` goes to `trails`, and a gear file like `hiking_gear/gear_items.csv` goes to `gear_categories` and `gear_products` (its ` | `-joined `reasons` become an array). The body names the object keys, and either file may be left out:
+
+```powershell
+uv run --group experiments dvc pull
+uv run python -c "import minio; c = minio.Minio('localhost:9090', access_key='minio', secret_key='miniosecret', secure=False); c.fput_object('trip-planner-data', 'trails.csv', 'trip_planner/experiments/data/picos_trails/trails.csv'); c.fput_object('trip-planner-data', 'gear_items.csv', 'trip_planner/experiments/data/hiking_gear/gear_items.csv')"
+curl.exe -X POST http://localhost:8000/indexing -H "Content-Type: application/json" -d '{\"trails_file\": \"trails.csv\", \"gear_items_file\": \"gear_items.csv\"}'
+```
+
+Any S3 client works too. Copying files into MinIO's data directory does not: MinIO does not serve them. The DVC bucket itself holds content-addressed files without names, so the CSVs go to their own bucket.
+
+- Rows are matched on their natural key: trail code; category name; category, item type and product. Indexing a file again only refreshes its rows, and rows missing from a file are kept. Re-indexing never overwrites the columns curated by hand: a trail's `massif`, `start_point`, `route_type`, `rockfall_risk` and `highlights`, and a product's `equipment_item_id`.
+- Both files are read and validated before anything is written. A missing object, a file that is not `.csv`, a missing column, an invalid value (reported with its line) or a trail without length, duration or difficulty answers 400 and leaves the database unchanged. A row repeated in a file is written once, with its last values.
+- Requests are serialized. The chain is `StorageClient` and `DatabaseClient` (`core/clients/`) → `SourceDataProvider` (`core/providers/`) and the repositories in `core/repositories/postgres/` → `SourceDataIndexing` (`ml/source_data_indexing/`) → `SourceDataIndexingPipeline` (`pipelines/source_data_indexing/`) → `IndexingService` (`inference/services/indexing.py`).
+
+The agents' tools still read `trip_planner/data/`. Moving them to the database is a separate step.
 
 ## Code layout
 
@@ -313,10 +331,11 @@ trip_planner/
     service_launcher.py     FastAPI app
     agents/                 BaseAgent (generic graph), the two agents + prompts, tools/ (ToolSet), callbacks/
     config/                 settings sections
-    core/                   errors, schemas, repositories/local_store, sql_models, migrations
-    inference/              routers + services (InferenceService, SimulationService)
+    core/                   errors, schemas, clients (database, MinIO storage), providers (source data CSV), repositories/{local_store,postgres}, sql_models, migrations
+    inference/              routers + services (InferenceService, SimulationService, IndexingService)
     ml/                     environment, fault_injection, simulated_human, live_human, weather_forecast,
-                            fitness_assessment, trail_selection, equipment_check, evaluation
+                            fitness_assessment, trail_selection, equipment_check, evaluation, source_data_indexing
+    pipelines/              source_data_indexing (MinIO CSV files -> database)
   unit_test/                29 tests, incl. a scripted end-to-end run
 ```
 
