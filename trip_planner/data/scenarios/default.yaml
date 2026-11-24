@@ -1,0 +1,45 @@
+# Default test scenario: a customer with a knee injury plans a one-day hike.
+name: default
+# null = plan from today's date (live forecast). Set a date to pin the calendar.
+start_date: null
+
+customer:
+  name: Alex Moreno
+  description: >-
+    You are Alex Moreno, 45 years old, a customer of a mountain-trip company
+    in Picos de Europa. Fitness: moderate (you jog twice a week). Health: a
+    mild injury in the left knee; long steep descents hurt. You want a guided
+    one-day hike, alone (party of 1), within the next 7 days, with lake or
+    gorge views, starting no earlier than 08:00. Gear you own: hiking boots,
+    a rain jacket and a backpack. Nothing else. You trust your assistant and
+    accept any reasonable plan that respects your knee. When you receive a
+    final plan that has a booking id, thank your assistant in one short
+    sentence and mark the conversation complete. Answer questions with the
+    facts above only; never invent new needs.
+  initial_message: >-
+    Hi! I'd like to book a guided one-day hike in Picos de Europa sometime in
+    the next 7 days. I'm 45, moderately fit, but I have a mild left-knee
+    injury, so steep descents are a problem. I'd love lake or gorge views.
+    It's just me, and I'd rather not start before 8am. I already have hiking
+    boots, a rain jacket and a backpack. My name is Alex Moreno.
+
+guide:
+  name: Lucia Prieto
+  description: >-
+    You are Lucia Prieto, a mountain guide at a trip company in Picos de
+    Europa. You only talk to your operations assistant. You do not work on
+    Mondays and Tuesdays. Ruta del Cares is closed this week for rockfall
+    clean-up. You approve a proposed trip when it is on a day you work, on an
+    open trail and within the customer's limits. On routes with rockfall
+    risk, your conditions are: helmet required, meeting at 08:00 at the start
+    point. Approve or reject in one or two sentences and state your
+    conditions. Stay silent (empty message) when nothing needs your answer.
+    Never mark the conversation complete.
+  initial_message: >-
+    Heads-up for this week: Ruta del Cares is closed for rockfall clean-up.
+    Reminder that I don't guide on Mondays and Tuesdays, and helmets are
+    mandatory on any route with rockfall risk.
+
+trail_closures:
+  - trail_id: ruta_del_cares
+    reason: Closed by the park administration for rockfall clean-up.

@@ -1,0 +1,12 @@
+{
+  "description": "Recorded 7-day forecast pattern for Lagos de Covadonga. Day 0 is the planning date; the fixture variant maps day i to planning_date + i.",
+  "days": [
+    {"weather": "rain", "temperature_max_c": 11.0, "temperature_min_c": 6.0, "precipitation_probability": 90, "precipitation_mm": 14.2, "wind_speed_max_kmh": 32.0},
+    {"weather": "drizzle", "temperature_max_c": 12.5, "temperature_min_c": 7.0, "precipitation_probability": 60, "precipitation_mm": 3.1, "wind_speed_max_kmh": 24.0},
+    {"weather": "partly cloudy", "temperature_max_c": 15.0, "temperature_min_c": 7.5, "precipitation_probability": 20, "precipitation_mm": 0.2, "wind_speed_max_kmh": 15.0},
+    {"weather": "clear sky", "temperature_max_c": 17.0, "temperature_min_c": 8.0, "precipitation_probability": 5, "precipitation_mm": 0.0, "wind_speed_max_kmh": 10.0},
+    {"weather": "clear sky", "temperature_max_c": 18.0, "temperature_min_c": 9.0, "precipitation_probability": 0, "precipitation_mm": 0.0, "wind_speed_max_kmh": 12.0},
+    {"weather": "overcast", "temperature_max_c": 14.0, "temperature_min_c": 8.0, "precipitation_probability": 35, "precipitation_mm": 0.8, "wind_speed_max_kmh": 20.0},
+    {"weather": "thunderstorm", "temperature_max_c": 13.0, "temperature_min_c": 7.0, "precipitation_probability": 80, "precipitation_mm": 9.5, "wind_speed_max_kmh": 40.0}
+  ]
+}

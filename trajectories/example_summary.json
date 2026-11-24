@@ -1,0 +1,29 @@
+{
+  "batch_id": "batch-20261124-150321-59381c",
+  "scenario": "default",
+  "runs": 5,
+  "statuses": {
+    "converged": 5
+  },
+  "outcome_counts": {
+    "bulnes_poncebos|2026-11-28|helmet,map_or_gps,trekking_poles,warm_layer": 5
+  },
+  "modal_outcome": "bulnes_poncebos|2026-11-28|helmet,map_or_gps,trekking_poles,warm_layer",
+  "convergence_rate": 1.0,
+  "success_rate": 1.0,
+  "mean_ticks": 8.0,
+  "mean_wall_time_s": 31.52,
+  "p95_wall_time_s": 32.05,
+  "mean_llm_calls": 27.0,
+  "total_tokens": 283098,
+  "total_cost_usd": 0.1227,
+  "injected_failures": 11,
+  "failure_recovery_rate": 0.875,
+  "trajectory_files": [
+    "trajectories\\batch-20261124-150321-59381c\\run_0.json",
+    "trajectories\\batch-20261124-150321-59381c\\run_1.json",
+    "trajectories\\batch-20261124-150321-59381c\\run_2.json",
+    "trajectories\\batch-20261124-150321-59381c\\run_3.json",
+    "trajectories\\batch-20261124-150321-59381c\\run_4.json"
+  ]
+}
