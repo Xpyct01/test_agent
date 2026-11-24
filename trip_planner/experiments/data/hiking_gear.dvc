@@ -1,0 +1,6 @@
+outs:
+- md5: ad6ac6f5ca644f9a7cb8b16e38e054aa.dir
+  size: 159869
+  nfiles: 2
+  hash: md5
+  path: hiking_gear

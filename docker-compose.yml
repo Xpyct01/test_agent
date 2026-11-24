@@ -5,7 +5,8 @@
 #
 # Langfuse UI: http://localhost:3000. Its login and API keys (below) are
 # created on first start. Host ports: LANGFUSE_PORT (3000), MINIO_PORT (9090),
-# TRIP_PLANNER_PORT (8000). The defaults are for local development only:
+# TRIP_PLANNER_PORT (8000). MinIO also hosts the DVC remote (bucket `dvc`,
+# see trip_planner/experiments/README.md). The defaults are for local development only:
 # override them in the root .env before exposing this stack anywhere.
 
 x-langfuse-env: &langfuse-env
@@ -137,8 +138,8 @@ services:
     image: cgr.dev/chainguard/minio
     restart: unless-stopped
     entrypoint: sh
-    # Creates the langfuse bucket before starting the server.
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    # Creates the langfuse bucket and the DVC remote bucket before starting the server.
+    command: -c 'mkdir -p /data/langfuse /data/dvc && minio server --address ":9000" --console-address ":9001" /data'
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
