@@ -19,6 +19,9 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest", "pytest-asyncio"]
+experiments = [
+    "beautifulsoup4>=4.15.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

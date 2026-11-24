@@ -1,0 +1,6 @@
+outs:
+- md5: 61a3917ad88f3bc2e915f3515feeba39.dir
+  size: 2401126
+  nfiles: 33
+  hash: md5
+  path: picos_trails
