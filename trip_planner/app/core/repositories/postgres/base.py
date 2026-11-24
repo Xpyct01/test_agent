@@ -1,4 +1,4 @@
-"""Shared upsert logic of the repositories backed by PostgreSQL."""
+"""Shared query and upsert logic of the repositories backed by PostgreSQL."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -23,6 +23,34 @@ class BasePostgresRepository:
             database_client: Pool the statements run on.
         """
         self._database = database_client
+
+    async def _fetch_models(self, statement: sa.Select[Any]) -> list[Any]:
+        """Runs a query that selects one table model and returns its rows.
+
+        Args:
+            statement: A `SELECT` of one table model.
+
+        Returns:
+            The selected model instances, in query order.
+        """
+        async with self._database.transaction() as session:
+            result = await session.scalars(statement)
+            return list(result.all())
+
+    async def _fetch_rows(
+        self, statement: sa.Select[Any]
+    ) -> list[sa.Row[Any]]:
+        """Runs a query that selects columns and returns its rows.
+
+        Args:
+            statement: A `SELECT` of columns.
+
+        Returns:
+            The selected rows, in query order.
+        """
+        async with self._database.transaction() as session:
+            result = await session.execute(statement)
+            return list(result.all())
 
     async def _upsert(
         self,

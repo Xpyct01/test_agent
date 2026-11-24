@@ -1,7 +1,7 @@
 """Tools over the park's trails: search and live status."""
 
 from trip_planner.app.agents.tools import base
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import trail as trail_lib
 from trip_planner.app.core.schemas import tools
 from trip_planner.app.core.schemas import trip
 from trip_planner.app.ml.trail_selection import core as trail_selection_lib
@@ -49,7 +49,7 @@ class TrailTools(base.BaseTools):
             Up to 5 ranked trails (rank 1 is the best fit) with their ids,
             distance, elevation, difficulty and rockfall risk.
         """
-        options, excluded = self._trail_selection.select(
+        options, excluded = await self._trail_selection.select(
             max_distance_km, max_elevation_gain_m, max_difficulty, interests
         )
         return base.to_result(
@@ -79,7 +79,7 @@ class TrailTools(base.BaseTools):
             statuses = []
             for trail_id in trail_ids:
                 closure = context.trail_status.get_closure(trail_id)
-                trail = self._trail_repository.get(trail_id)
+                trail = await self._trail_repository.get(trail_id)
                 if trail is None:
                     statuses.append(
                         tools.TrailStatus(

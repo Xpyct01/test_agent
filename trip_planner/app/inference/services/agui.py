@@ -123,6 +123,9 @@ class AgUiService:
         self._simulation = simulation_service
         self._config = simulation_config
         self._runs: dict[str, _LiveRun] = {}
+        # Building a run reads the database; the lock keeps two requests of
+        # one thread from starting two runs meanwhile.
+        self._start_lock = asyncio.Lock()
 
     async def run(
         self, run_input: agui.RunAgentInput
@@ -135,7 +138,8 @@ class AgUiService:
         thread_id, run_id = run_input.thread_id, run_input.run_id
         yield agui.RunStartedEvent(threadId=thread_id, runId=run_id)
         try:
-            live = self._live_run_for(run_input)
+            async with self._start_lock:
+                live = await self._live_run_for(run_input)
         except (ValueError, errors.InvalidRequestError) as error:
             yield agui.RunErrorEvent(message=str(error), code='bad_request')
             return
@@ -166,7 +170,9 @@ class AgUiService:
                     # The client went away: do not spend tokens for nobody.
                     live.task.cancel()
 
-    def _live_run_for(self, run_input: agui.RunAgentInput) -> _LiveRun:
+    async def _live_run_for(
+        self, run_input: agui.RunAgentInput
+    ) -> _LiveRun:
         props = run_input.forwarded_props or {}
         mode = props.get('mode', 'watch')
         if mode not in ('watch', 'play'):
@@ -190,13 +196,13 @@ class AgUiService:
                 conversation_complete=bool(props.get('conversationComplete')),
             )
         if live is None:
-            live = self._start(thread_id, mode, props.get('scenario'))
+            live = await self._start(thread_id, mode, props.get('scenario'))
         if turn is not None:
             live.state['status'] = 'running'
             live.channel.submit(turn)
         return live
 
-    def _start(
+    async def _start(
         self, thread_id: str, mode: Mode, scenario_name: str | None
     ) -> _LiveRun:
         active = sum(1 for live in self._runs.values() if not live.done)
@@ -214,7 +220,7 @@ class AgUiService:
                 run_context_provider=self._simulation.run_context_provider,
                 input_timeout_s=self._config.live_input_timeout_s,
             )
-        run = self._simulation.build_run(
+        run = await self._simulation.build_run(
             self._simulation.new_batch_id(mode), 0, scenario, customer
         )
         context = run.run_context

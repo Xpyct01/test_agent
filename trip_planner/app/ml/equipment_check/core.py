@@ -2,8 +2,8 @@
 
 from collections.abc import Sequence
 
-from trip_planner.app.core.repositories.local_store import (
-    equipment as equipment_lib,
+from trip_planner.app.core.repositories.postgres import (
+    equipment_item as equipment_item_lib,
 )
 from trip_planner.app.core.schemas import tools
 from trip_planner.app.core.schemas import trip
@@ -18,7 +18,9 @@ _LONG_DAY_H = 6.0
 class EquipmentCheck:
     """Rule-based gear requirements from the trail, weather and health."""
 
-    def __init__(self, equipment_repository: equipment_lib.EquipmentRepository):
+    def __init__(
+        self, equipment_repository: equipment_item_lib.EquipmentItemRepository
+    ):
         """Initializes the checker.
 
         Args:
@@ -26,7 +28,7 @@ class EquipmentCheck:
         """
         self._equipment_repository = equipment_repository
 
-    def check(
+    async def check(
         self,
         trail: trip.Trail,
         day: trip.DailyForecast | None,
@@ -44,11 +46,12 @@ class EquipmentCheck:
         Returns:
             The gear lists and why each item is required.
         """
+        catalogue = await self._equipment_repository.list_all()
         active = self._active_conditions(trail, day, has_joint_issues)
-        owned_ids, unrecognized = self._match_owned(owned_items)
+        owned_ids, unrecognized = self._match_owned(catalogue, owned_items)
         required, owned, rentable, to_buy = [], [], [], []
         reasons = {}
-        for item in self._equipment_repository.list_all():
+        for item in catalogue:
             if item.required_when not in active:
                 continue
             required.append(item.item_id)
@@ -98,9 +101,10 @@ class EquipmentCheck:
         return active
 
     def _match_owned(
-        self, owned_items: Sequence[str]
+        self,
+        catalogue: Sequence[trip.EquipmentItem],
+        owned_items: Sequence[str],
     ) -> tuple[set[str], list[str]]:
-        catalogue = self._equipment_repository.list_all()
         matched, unrecognized = set(), []
         for owned in owned_items:
             text = owned.strip().lower().replace('_', ' ')

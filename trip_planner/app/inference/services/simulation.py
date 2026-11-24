@@ -24,6 +24,9 @@ from trip_planner.app.core.repositories.local_store import (
 from trip_planner.app.core.repositories.local_store import (
     scenario as scenario_lib,
 )
+from trip_planner.app.core.repositories.postgres import (
+    rental_stock as rental_stock_db_lib,
+)
 from trip_planner.app.core.repositories.local_store import (
     trail_status as trail_status_lib,
 )
@@ -62,6 +65,7 @@ class SimulationService:
         run_context_provider: run_context_lib.RunContextProvider,
         observability: observability_lib.ObservabilityCallbacks,
         scenario_repository: scenario_lib.ScenarioRepository,
+        rental_stock_repository: rental_stock_db_lib.RentalStockRepository,
         evaluator: evaluation_lib.BatchEvaluator,
         simulation_config: simulation_config_lib.SimulationConfiguration,
         agents_config: agents_config_lib.AgentsConfiguration,
@@ -74,6 +78,8 @@ class SimulationService:
             run_context_provider: Makes the active run visible to tools.
             observability: Tracing callbacks.
             scenario_repository: The test scenarios.
+            rental_stock_repository: Units of rental gear the company owns;
+                every run starts from them.
             evaluator: Summarises a batch.
             simulation_config: Simulation settings.
             agents_config: Agent settings; token prices are read.
@@ -83,6 +89,7 @@ class SimulationService:
         self._run_context_provider = run_context_provider
         self._observability = observability
         self._scenario_repository = scenario_repository
+        self._rental_stock_repository = rental_stock_repository
         self._evaluator = evaluator
         self._simulation_config = simulation_config
         self._agents_config = agents_config
@@ -112,9 +119,8 @@ class SimulationService:
 
         trajectories, files = [], []
         for run_index in range(request.runs):
-            trajectory = await self.build_run(
-                batch_id, run_index, scenario
-            ).run()
+            run = await self.build_run(batch_id, run_index, scenario)
+            trajectory = await run.run()
             path = batch_dir / f'run_{run_index}.json'
             await asyncio.to_thread(
                 path.write_text, trajectory.model_dump_json(indent=2),
@@ -179,7 +185,7 @@ class SimulationService:
         now = datetime.datetime.now()
         return f'{prefix}-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}'
 
-    def build_run(
+    async def build_run(
         self,
         batch_id: str,
         run_index: int,
@@ -220,7 +226,7 @@ class SimulationService:
             ),
             bookings=booking_lib.BookingRepository(),
             rental_stock=rental_stock_lib.RentalStockRepository(
-                config.data_dir / 'rental_stock.json'
+                await self._rental_stock_repository.units_by_item()
             ),
         )
         humans = [

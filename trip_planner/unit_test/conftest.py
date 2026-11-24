@@ -1,14 +1,9 @@
-"""Shared fixtures: real data repositories, fixture weather, the ToolSet."""
+"""Shared fixtures: catalogue fakes, fixture weather, the ToolSet."""
 
 import pytest
 
 from trip_planner.app.agents.tools import core as tools_lib
 from trip_planner.app.config import weather as weather_config_lib
-from trip_planner.app.core.repositories.local_store import (
-    equipment as equipment_lib,
-)
-from trip_planner.app.core.repositories.local_store import guide as guide_lib
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
 from trip_planner.app.ml.environment import run_context as run_context_lib
 from trip_planner.app.ml.equipment_check import core as equipment_check_lib
 from trip_planner.app.ml.fitness_assessment import core as fitness_lib
@@ -18,13 +13,13 @@ from trip_planner.unit_test import fakes
 
 
 @pytest.fixture
-def trail_repository() -> trail_lib.TrailRepository:
-    return trail_lib.TrailRepository(fakes.DATA_DIR / 'trails.json')
+def trail_repository() -> fakes.FakeTrailRepository:
+    return fakes.FakeTrailRepository()
 
 
 @pytest.fixture
-def equipment_repository() -> equipment_lib.EquipmentRepository:
-    return equipment_lib.EquipmentRepository(fakes.DATA_DIR / 'equipment.json')
+def equipment_repository() -> fakes.FakeEquipmentItemRepository:
+    return fakes.FakeEquipmentItemRepository()
 
 
 @pytest.fixture
@@ -53,8 +48,6 @@ def tool_set(
         weather_forecast=weather_forecast,
         trail_repository=trail_repository,
         equipment_repository=equipment_repository,
-        guide_repository=guide_lib.GuideRepository(
-            fakes.DATA_DIR / 'guides.json'
-        ),
+        guide_repository=fakes.FakeGuideRepository(),
         simulation_config=fakes.simulation_config(max_tool_attempts=3),
     )

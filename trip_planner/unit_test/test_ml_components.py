@@ -3,6 +3,7 @@
 import pytest
 
 from trip_planner.app.core import errors
+from trip_planner.app.core.schemas import trip
 from trip_planner.app.ml.equipment_check import core as equipment_check_lib
 from trip_planner.app.ml.fault_injection import core as fault_injection_lib
 from trip_planner.app.ml.fitness_assessment import core as fitness_lib
@@ -27,8 +28,10 @@ def test_fitness_caps_difficulty_for_heart_condition():
     assert profile.max_difficulty == 'easy'
 
 
-def test_trail_selection_ranks_interests_then_length(trail_repository):
-    options, excluded = trail_selection_lib.TrailSelection(
+async def test_trail_selection_ranks_interests_then_length(
+    trail_repository,
+):
+    options, excluded = await trail_selection_lib.TrailSelection(
         trail_repository
     ).select(14.0, 490, 'moderate', ['lakes', 'gorge'])
     assert [o.trail.trail_id for o in options] == [
@@ -36,6 +39,22 @@ def test_trail_selection_ranks_interests_then_length(trail_repository):
         'fuente_de_aliva',
     ]
     assert excluded == 4
+
+
+async def test_trail_selection_skips_trails_without_ascent():
+    class _Repository:
+        async def list_all(self):
+            return [trip.Trail(
+                trail_id='PR-PNPE 26', name='x', massif=None,
+                start_point=None, distance_km=4.0, elevation_gain_m=None,
+                duration_h=1.5, difficulty='easy', route_type=None,
+                highlights=[], rockfall_risk=False, source_url='u',
+            )]
+
+    options, excluded = await trail_selection_lib.TrailSelection(
+        _Repository()
+    ).select(14.0, 490, 'moderate', [])
+    assert options == [] and excluded == 1
 
 
 async def test_fixture_forecast_maps_days_and_scores(weather_forecast):
@@ -49,8 +68,10 @@ async def test_equipment_check_splits_gear(
     equipment_repository, trail_repository, weather_forecast
 ):
     days = await weather_forecast.forecast(fakes.PLANNING_DATE)
-    result = equipment_check_lib.EquipmentCheck(equipment_repository).check(
-        trail_repository.get('bulnes_poncebos'),
+    result = await equipment_check_lib.EquipmentCheck(
+        equipment_repository
+    ).check(
+        await trail_repository.get('bulnes_poncebos'),
         days[4],
         ['hiking boots', 'a rain jacket', 'backpack', 'lucky charm'],
         has_joint_issues=True,

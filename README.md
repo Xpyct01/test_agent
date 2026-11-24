@@ -18,7 +18,9 @@ Stack: **LangGraph** (agents), **OpenAI** (LLM), **Open-Meteo** (live weather), 
 ```powershell
 uv sync                                   # install
 copy .env.example .env                    # then set TRIP_OPENAI_API_KEY
-uv run pytest                             # 29 tests, no API key needed
+uv run pytest                             # no API key or database needed
+docker compose up -d trip-planner-postgres
+uv run alembic upgrade head               # schema + the catalogue the agents read
 uv run python -m trip_planner.app.simulation_launcher --runs 5
 ```
 
@@ -296,9 +298,9 @@ uv run alembic revision --autogenerate -m "describe the change"   # after editin
 
 | Group | Tables | Source |
 |---|---|---|
-| Trails | `trails`, `trail_closures` | `experiments/data/picos_trails/trails.csv` (park pages). Curated columns (`massif`, `route_type`, `rockfall_risk`, `highlights`) stay nullable. |
-| Gear | `gear_categories`, `gear_products`, `equipment_items`, `rental_stock` | `gear_products` comes from `experiments/data/hiking_gear/gear_items.csv`. `equipment_items` is the checklist the agents use (`data/equipment.json`). |
-| People | `guides`, `customers`, `customer_gear` | `data/guides.json`, plus the customer profile, health notes and owned gear |
+| Trails | `trails`, `trail_closures` | The company's 8 curated routes (seed migration) and `experiments/data/picos_trails/trails.csv` (park pages, via `/indexing`). Curated columns (`massif`, `route_type`, `rockfall_risk`, `highlights`) stay nullable. |
+| Gear | `gear_categories`, `gear_products`, `equipment_items`, `rental_stock` | `gear_products` comes from `experiments/data/hiking_gear/gear_items.csv`. `equipment_items` (the checklist the agents use) and `rental_stock` come from the seed migration. |
+| People | `guides`, `customers`, `customer_gear` | `guides` from the seed migration, plus the customer profile, health notes and owned gear |
 | Bookings | `bookings`, `booking_rentals` | Content-derived booking id (idempotent retries). A partial unique index allows one confirmed booking per guide per day. |
 | Evaluation | `simulation_batches`, `simulation_runs`, `trajectory_events` | `Trajectory` / `BatchSummary` of each run, for convergence and drift queries |
 
@@ -318,14 +320,18 @@ Any S3 client works too. Copying files into MinIO's data directory does not: Min
 - Both files are read and validated before anything is written. A missing object, a file that is not `.csv`, a missing column, an invalid value (reported with its line) or a trail without length, duration or difficulty answers 400 and leaves the database unchanged. A row repeated in a file is written once, with its last values.
 - Requests are serialized. The chain is `StorageClient` and `DatabaseClient` (`core/clients/`) → `SourceDataProvider` (`core/providers/`) and the repositories in `core/repositories/postgres/` → `SourceDataIndexing` (`ml/source_data_indexing/`) → `SourceDataIndexingPipeline` (`pipelines/source_data_indexing/`) → `IndexingService` (`inference/services/indexing.py`).
 
-The agents' tools still read `trip_planner/data/`. Moving them to the database is a separate step.
+### What the agents read
+
+The agents' tools read the catalogue from the database through `core/repositories/postgres/` (`TrailRepository`, `EquipmentItemRepository`, `GuideRepository`, `RentalStockRepository`). The seed migration `c41f7a2e9b35` writes the company's curated trails, the gear checklist, the guides and the rental stock, so `alembic upgrade head` is all a fresh database needs. A trail's code is the `trail_id` the agents and scenarios use: curated routes have short slugs (`ruta_del_cares`, `picu_urriellu`, ...), and park trails loaded by `/indexing` show up with their park code (`PR-PNPE 3`). A park trail without a published ascent is never suggested, since it cannot be checked against the customer's limits.
+
+Bookings, rental reservations and trail closures stay in memory per run (`core/repositories/local_store/`): each run starts from the stock in `rental_stock` and the closures of its scenario, so the runs of a batch never see each other's bookings. The unit tests use in-memory fakes of the Postgres repositories over `unit_test/data/*.json`.
 
 ## Code layout
 
 ```
 frontend/                   React + @ag-ui/client UI (Vite; nginx image for compose)
 trip_planner/
-  data/                     trails, gear, guides, rental stock, weather fixture, scenarios
+  data/                     weather fixture, scenarios
   app/
     simulation_launcher.py  CLI
     service_launcher.py     FastAPI app
@@ -388,7 +394,7 @@ Run it in CI on every prompt or model change and compare against a stored baseli
 ## What I would improve with more time
 
 - An async job API (`202` + polling or webhooks) instead of a synchronous `POST /simulations`.
-- A persistent checkpointer (Postgres or SQLite) and a database instead of in-memory repositories.
+- A persistent checkpointer (Postgres or SQLite), and bookings and reservations in the database, scoped per run.
 - More scenarios plus the LLM-judge evaluation suite; a Langfuse dataset to run experiments.
 - Real trail data scraped from the park website and a live trail-closure source.
 - Negotiation loops (the guide proposes another date), multi-day trips, groups.

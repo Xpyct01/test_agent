@@ -5,24 +5,31 @@ from typing import Literal
 
 import pydantic
 
-Difficulty = Literal['easy', 'moderate', 'hard']
+Difficulty = Literal['easy', 'moderate', 'hard', 'very_hard']
 FitnessLevel = Literal['low', 'moderate', 'high']
 
-DIFFICULTY_ORDER: dict[str, int] = {'easy': 0, 'moderate': 1, 'hard': 2}
+DIFFICULTY_ORDER: dict[str, int] = {
+    'easy': 0, 'moderate': 1, 'hard': 2, 'very_hard': 3
+}
 
 
 class Trail(pydantic.BaseModel):
-    """A hiking route of the Picos de Europa National Park."""
+    """A hiking route of the Picos de Europa National Park.
+
+    `trail_id` is the trail's code in the database. Massif, start point and
+    route type are None for park trails the company has not curated yet;
+    `elevation_gain_m` is None when the park publishes no ascent.
+    """
 
     trail_id: str
     name: str
-    massif: str
-    start_point: str
+    massif: str | None
+    start_point: str | None
     distance_km: float
-    elevation_gain_m: int
+    elevation_gain_m: int | None
     duration_h: float
     difficulty: Difficulty
-    route_type: Literal['circular', 'linear', 'out_and_back']
+    route_type: Literal['circular', 'linear', 'out_and_back'] | None
     highlights: list[str]
     rockfall_risk: bool
     source_url: str

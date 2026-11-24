@@ -7,13 +7,13 @@ from trip_planner.app.agents.tools import health as health_lib
 from trip_planner.app.agents.tools import trails as trails_lib
 from trip_planner.app.agents.tools import weather as weather_lib
 from trip_planner.app.config import simulation as simulation_config_lib
-from trip_planner.app.core.repositories.local_store import (
-    equipment as equipment_repository_lib,
+from trip_planner.app.core.repositories.postgres import (
+    equipment_item as equipment_item_repository_lib,
 )
-from trip_planner.app.core.repositories.local_store import (
+from trip_planner.app.core.repositories.postgres import (
     guide as guide_repository_lib,
 )
-from trip_planner.app.core.repositories.local_store import (
+from trip_planner.app.core.repositories.postgres import (
     trail as trail_repository_lib,
 )
 from trip_planner.app.ml.environment import run_context as run_context_lib
@@ -43,7 +43,9 @@ class ToolSet:
         equipment_check: equipment_check_lib.EquipmentCheck,
         weather_forecast: forecast_lib.AbstractWeatherForecast,
         trail_repository: trail_repository_lib.TrailRepository,
-        equipment_repository: equipment_repository_lib.EquipmentRepository,
+        equipment_repository: (
+            equipment_item_repository_lib.EquipmentItemRepository
+        ),
         guide_repository: guide_repository_lib.GuideRepository,
         simulation_config: simulation_config_lib.SimulationConfiguration,
     ):

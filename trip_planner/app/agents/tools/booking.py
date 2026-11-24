@@ -1,11 +1,13 @@
 """Tools over guide availability and bookings."""
 
+from collections.abc import Sequence
 import datetime
 
 from trip_planner.app.agents.tools import base
-from trip_planner.app.core.repositories.local_store import guide as guide_lib
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import guide as guide_lib
+from trip_planner.app.core.repositories.postgres import trail as trail_lib
 from trip_planner.app.core.schemas import tools
+from trip_planner.app.core.schemas import trip
 from trip_planner.app.ml.environment import run_context as run_context_lib
 
 _BOOKING_WINDOW_DAYS = 14
@@ -54,12 +56,13 @@ class BookingTools(base.BaseTools):
         context = self._run_context_provider.current()
 
         async def lookup() -> tools.GuideAvailabilityResult:
+            guides = await self._guide_repository.list_all()
             return tools.GuideAvailabilityResult(
                 dates=[
                     tools.DateAvailability(
                         date=date,
                         weekday=date.strftime('%A'),
-                        available_guides=self._free_guides(context, date),
+                        available_guides=_free_guides(guides, context, date),
                     )
                     for date in parsed
                 ]
@@ -100,7 +103,7 @@ class BookingTools(base.BaseTools):
             datetime.time.fromisoformat(start_time)
         except ValueError:
             problem = 'date must be YYYY-MM-DD and start_time HH:MM.'
-        guide = self._guide_repository.get(guide_name)
+        guide = await self._guide_repository.get(guide_name)
         if problem is None and (
             existing := context.bookings.find(trail_id, trip_date, customer_name)
         ):
@@ -109,7 +112,7 @@ class BookingTools(base.BaseTools):
                 tools.BookingResult(booking=existing, already_existed=True)
             )
         if problem is None:
-            if self._trail_repository.get(trail_id) is None:
+            if await self._trail_repository.get(trail_id) is None:
                 problem = f'unknown trail_id {trail_id!r}.'
             elif (closure := context.trail_status.get_closure(trail_id)):
                 problem = f'trail {trail_id} is closed: {closure.reason}'
@@ -120,7 +123,9 @@ class BookingTools(base.BaseTools):
                 problem = f'{date} is outside the booking window.'
             elif guide is None:
                 problem = f'unknown guide {guide_name!r}.'
-            elif guide.name not in self._free_guides(context, trip_date):
+            elif guide.name not in _free_guides(
+                await self._guide_repository.list_all(), context, trip_date
+            ):
                 problem = f'{guide.name} is not available on {date}.'
             elif party_size > guide.max_party_size:
                 problem = f'party of {party_size} exceeds the guide limit.'
@@ -140,13 +145,17 @@ class BookingTools(base.BaseTools):
             await self._call_with_faults('create_booking', book)
         )
 
-    def _free_guides(
-        self, context: run_context_lib.RunContext, date: datetime.date
-    ) -> list[str]:
-        weekday = date.strftime('%A')
-        return [
-            guide.name
-            for guide in self._guide_repository.list_all()
-            if weekday not in guide.unavailable_weekdays
-            and not context.bookings.is_guide_booked(guide.name, date)
-        ]
+
+def _free_guides(
+    guides: Sequence[trip.Guide],
+    context: run_context_lib.RunContext,
+    date: datetime.date,
+) -> list[str]:
+    """Returns the guides who work on `date` and have no booking on it."""
+    weekday = date.strftime('%A')
+    return [
+        guide.name
+        for guide in guides
+        if weekday not in guide.unavailable_weekdays
+        and not context.bookings.is_guide_booked(guide.name, date)
+    ]

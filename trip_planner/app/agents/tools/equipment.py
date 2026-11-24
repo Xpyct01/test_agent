@@ -4,10 +4,10 @@ import datetime
 
 from trip_planner.app.agents.tools import base
 from trip_planner.app.core import errors
-from trip_planner.app.core.repositories.local_store import (
-    equipment as equipment_lib,
+from trip_planner.app.core.repositories.postgres import (
+    equipment_item as equipment_item_lib,
 )
-from trip_planner.app.core.repositories.local_store import trail as trail_lib
+from trip_planner.app.core.repositories.postgres import trail as trail_lib
 from trip_planner.app.core.schemas import tools
 from trip_planner.app.ml.equipment_check import core as equipment_check_lib
 from trip_planner.app.ml.weather_forecast import abstract as weather_lib
@@ -19,7 +19,7 @@ class EquipmentTools(base.BaseTools):
     def __init__(
         self,
         equipment_check: equipment_check_lib.EquipmentCheck,
-        equipment_repository: equipment_lib.EquipmentRepository,
+        equipment_repository: equipment_item_lib.EquipmentItemRepository,
         trail_repository: trail_lib.TrailRepository,
         weather_forecast: weather_lib.AbstractWeatherForecast,
         **base_kwargs,
@@ -60,7 +60,7 @@ class EquipmentTools(base.BaseTools):
             (the company can rent them) and missing_to_buy, with the reason
             each item is required.
         """
-        trail = self._trail_repository.get(trail_id)
+        trail = await self._trail_repository.get(trail_id)
         if trail is None:
             return base.to_result(
                 tools.ToolError(error=f'Unknown trail_id {trail_id!r}.')
@@ -80,7 +80,7 @@ class EquipmentTools(base.BaseTools):
             days = []
         day = next((d for d in days if d.date == trip_date), None)
         return base.to_result(
-            self._equipment_check.check(
+            await self._equipment_check.check(
                 trail, day, owned_items, has_joint_issues
             )
         )
@@ -127,7 +127,7 @@ class EquipmentTools(base.BaseTools):
             )
         prices = {
             item.item_id: item.rental_price_eur
-            for item in self._equipment_repository.list_all()
+            for item in await self._equipment_repository.list_all()
         }
 
         async def reserve() -> tools.RentalReservationResult:

@@ -1,25 +1,24 @@
 """Rental gear stock of one simulation run."""
 
-import pathlib
+from collections.abc import Mapping
 
-from trip_planner.app.core.repositories.local_store import base
 from trip_planner.app.core.schemas import trip
 
 
-class RentalStockRepository(base.BaseJsonRepository):
-    """Stock loaded from `rental_stock.json`, mutated by reservations.
+class RentalStockRepository:
+    """In-memory stock of one run, counted down by its reservations.
 
-    Built once per run, so runs never see each other's reservations.
+    Starts from the units the company owns (the `rental_stock` table) and
+    is built once per run, so runs never see each other's reservations.
     """
 
-    def __init__(self, path: pathlib.Path):
+    def __init__(self, units_by_item: Mapping[str, int]):
         """Initializes the repository.
 
         Args:
-            path: The rental stock file.
+            units_by_item: Units owned of every rentable item, by item id.
         """
-        super().__init__(path)
-        self._stock: dict[str, int] = dict(self._raw)
+        self._stock: dict[str, int] = dict(units_by_item)
         self._reservations: dict[str, trip.RentalReservation] = {}
 
     def stock_of(self, item_id: str) -> int | None:
